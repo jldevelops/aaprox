@@ -1,0 +1,220 @@
+{
+	init: `{
+		$ASSET = 'hd936lRtPN11pkgNv8qVnqN2OHMyAp8P/NsLp6KsuqA=';
+		$DEFAULT_FEE = 1000;
+		$FEE_THRESHOLD = 10000;
+		$LOW_FEE = -600;
+		if(trigger.data.to AND !is_valid_address(trigger.data.to)) bounce('To param invalid');
+		if(trigger.data.from AND !is_valid_address(trigger.data.from)) bounce('From param invalid');
+		if(trigger.data.spender AND !is_valid_address(trigger.data.spender)) bounce('Spender param invalid');
+		if(!trigger.data.approve AND trigger.data.value AND (typeof(trigger.data.value) != 'number' OR trigger.data.value <= 0)) bounce('Value param invalid');
+		if(typeof(var['fee']) == 'number'){
+			$bal = balance[base] - trigger.output[[asset=base]];
+			if(var['fee'] > 0 AND $bal > $FEE_THRESHOLD)
+				$change_fee = $LOW_FEE;
+			if(var['fee'] < 0 AND $bal < 2000)
+				$change_fee = $DEFAULT_FEE;
+			if(var['fee'] < 0)
+				$fee = $LOW_FEE;
+			else
+				$fee = $DEFAULT_FEE;
+		}
+		else{
+			$fee = $DEFAULT_FEE;
+			$change_fee = $DEFAULT_FEE;
+		}
+		$base_inp = trigger.output[[asset=base]] - $fee;
+	}`,
+	messages: {
+		cases: [
+			{
+				if: `{
+					trigger.data.approve
+				}`,
+				init: `{
+					if(!trigger.data.spender) bounce('Spender param missing');
+					if(!trigger.data.value) bounce('Value param missing');
+					if(!var['a_' || trigger.address]) bounce('You have no funds');
+					if(typeof(trigger.data.value) != 'number' OR trigger.data.value < 0) bounce('Value param invalid');
+				}`,
+				messages: [
+					{
+						app: 'payment',
+						payload: {
+							asset: 'base',
+							outputs: [
+								{address: `{trigger.address}`,amount: `{$base_inp}`}
+							]
+						}
+					},
+					{
+						app: 'state',
+						state: `{
+							if($change_fee) var['fee'] = $change_fee;
+							var['perm_' || trigger.address || '_' || trigger.data.spender] = trigger.data.value;
+							if(var['perm_' || trigger.address || '_' || trigger.data.spender] == 0) var['perm_' || trigger.address || '_' || trigger.data.spender] = false;
+							response['message'] = 'Approved '||trigger.data.spender||' to spend '||trigger.data.value ||' from your account';
+						}`
+					}
+				]
+			},
+			{
+				if: `{
+					trigger.data.deposit
+				}`,
+				init: `{
+					if(trigger.output[[asset!=base]].asset != 'none')
+						$asset = trigger.output[[asset!=base]].asset;
+					else
+						bounce('You must deposit '||$ASSET);
+					if($asset == 'ambiguous') bounce('Only 1 asset per tx');
+					if($asset != $ASSET) bounce('You must deposit '||$ASSET);
+					$asset_inp = trigger.output[[asset!=base]];
+				}`,
+				messages: [
+					{
+						app: 'payment',
+						payload: {
+							asset: 'base',
+							outputs: [
+								{address: `{trigger.address}`,amount: `{$base_inp}`}
+							]
+						}
+					},
+					{
+						app: 'state',
+						state: `{
+							if($change_fee) var['fee'] = $change_fee;
+							var['a_' || trigger.address] += $asset_inp;
+							response['message'] = 'Added '||$asset_inp||' to your account';
+						}`
+					}
+				]
+			},
+			{
+				if: `{
+					trigger.data.withdraw
+				}`,
+				init: `{
+					if(!var['a_' || trigger.address]) bounce('Nothing to withdraw');
+					$max_w = var['a_' || trigger.address]-(var['a_' || trigger.address] % 1);
+					if(!trigger.data.value) bounce('Value param missing, max to withdraw '||$max_w) ;
+					$w_amount = trigger.data.value - (trigger.data.value % 1);
+					if($w_amount <= 0) bounce('Max to withdraw '||$max_w);
+					if($w_amount > $max_w) bounce('Not enough funds, max to withdraw '||$max_w);
+					
+				}`,
+				messages: [
+					{
+						app: 'payment',
+						payload: {
+							asset: 'base',
+							outputs: [
+								{address: `{trigger.address}`,amount: `{$base_inp}`}
+							]
+						}
+					},
+					{
+						app: 'payment',
+						payload: {
+							asset: `{$ASSET}`,
+							outputs: [
+								{address: `{trigger.address}`,amount: `{$w_amount}`}
+							]
+						}
+					},
+					{
+						app: 'state',
+						state: `{
+							if($change_fee) var['fee'] = $change_fee;
+							var['a_' || trigger.address] -= $w_amount;
+							response['message'] = 'Withdrawn '||$w_amount||' from your account';
+						}`
+					}
+				]
+			},
+			{
+				if: `{
+					trigger.data.transfer
+				}`,
+				init: `{
+					if(!var['a_'||trigger.address]) bounce('No funds found');
+					if(!trigger.data.to) bounce('To param missing');
+					if(!trigger.data.value) bounce('Value param missing');
+					if(trigger.data.value > var['a_'||trigger.address]) bounce('You have max '||var['a_'||trigger.address]);
+				}`,
+				messages: [
+					{
+						app: 'payment',
+						payload: {
+							asset: 'base',
+							outputs: [
+								{address: `{trigger.address}`,amount: `{$base_inp}`}
+							]
+						}
+					},
+					{
+						app: 'state',
+						state: `{
+							if($change_fee) var['fee'] = $change_fee;
+							var['a_' || trigger.data.to] += trigger.data.value;
+							var['a_'||trigger.address] -= trigger.data.value;
+							if(var['a_'||trigger.address] == 0) var['a_'||trigger.address] = false;
+							response['message'] = 'Transfered '||trigger.data.value||' to '||trigger.data.to;
+						}`
+					}
+				]
+			},
+			{
+				if: `{
+					trigger.data.transfer_from
+				}`,
+				init: `{
+					if(!trigger.data.from) bounce('From param missing');
+					if(!var['a_' || trigger.data.from]) bounce('Account have no funds');
+					if(!trigger.data.to) bounce('To param missing');
+					if(!trigger.data.value) bounce('Value param missing');
+					if(!var['perm_' || trigger.data.from || '_' || trigger.address]) bounce('Not allowed to spend');
+					if(var['perm_' || trigger.data.from || '_' || trigger.address] < trigger.data.value) bounce('You can spend max '||var['perm_' || trigger.data.from || '_' || trigger.address]);
+					if(trigger.data.value > var['a_' || trigger.data.from]) bounce('Account have '||var['a_' || trigger.data.from]);
+				}`,
+				messages: [
+					{
+						app: 'payment',
+						payload: {
+							asset: 'base',
+							outputs: [
+								{address: `{trigger.address}`,amount: `{$base_inp}`}
+							]
+						}
+					},
+					{
+						app: 'state',
+						state: `{
+							if($change_fee) var['fee'] = $change_fee;
+							var['a_' || trigger.data.to] += trigger.data.value;
+							var['a_' || trigger.data.from] -= trigger.data.value;
+							if(var['a_' || trigger.data.from] == 0) var['a_' || trigger.data.from] = false;
+							var['perm_' || trigger.data.from || '_' || trigger.address] -= trigger.data.value;
+							if(var['perm_' || trigger.data.from || '_' || trigger.address] == 0) var['perm_' || trigger.data.from || '_' || trigger.address] = false;
+							response['message'] = 'Transfered '||trigger.data.value||' to '||trigger.data.to;
+						}`
+					}
+				]
+			},
+			{
+				messages: [
+					{
+						app: 'state',
+						state: `{
+							if(trigger.output[[asset!=base]].asset != 'none') bounce('To deposit an asset, use deposit param');
+							var['fee'] = $LOW_FEE;
+							response['usage'] = 'Send param = 1 for continue. Accepted params: deposit,withdraw,transfer,transfer_from,approve';
+							response['message'] = 'Received bytes for funding AA operation, thaanks!';
+						}`
+					}
+				]
+			}
+		]
+	}
+}
