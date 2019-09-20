@@ -3,7 +3,7 @@
 		$ASSET = 'hd936lRtPN11pkgNv8qVnqN2OHMyAp8P/NsLp6KsuqA=';
 		$DEFAULT_FEE = 1000;
 		$FEE_THRESHOLD = 10000;
-		$LOW_FEE = -600;
+		$LOW_FEE = -600;//-unit[trigger.unit].fee
 		if(trigger.data.to AND !is_valid_address(trigger.data.to)) bounce('To param invalid');
 		if(trigger.data.from AND !is_valid_address(trigger.data.from)) bounce('From param invalid');
 		if(trigger.data.spender AND !is_valid_address(trigger.data.spender)) bounce('Spender param invalid');
