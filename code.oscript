@@ -3,18 +3,20 @@
 		$ASSET = 'hd936lRtPN11pkgNv8qVnqN2OHMyAp8P/NsLp6KsuqA=';
 		$DEFAULT_FEE = 1000;
 		$FEE_THRESHOLD = 10000;
-		$LOW_FEE = -600;//-unit[trigger.unit].fee
-		if(trigger.data.to AND !is_valid_address(trigger.data.to)) bounce('To param invalid');
-		if(trigger.data.from AND !is_valid_address(trigger.data.from)) bounce('From param invalid');
-		if(trigger.data.spender AND !is_valid_address(trigger.data.spender)) bounce('Spender param invalid');
-		if(!trigger.data.approve AND trigger.data.value AND (typeof(trigger.data.value) != 'number' OR trigger.data.value <= 0)) bounce('Value param invalid');
+		$LOW_FEE = -600;//-unit[trigger.unit].fee;
+		$addr = trigger.address;
+		$ATTESTOR_ADDR = 'JBGMJI7XSKLKNHZF26BUBWHVUZSDV3P5';
+		if(!attestation[[attestors=$ATTESTOR_ADDR, address=$addr,ifnone=false]]) bounce('Not allowed to use, please attest your address with '||$ATTESTOR_ADDR);
+		$A = 'a';$P = 'p';
+
+		$addr_key = $A||$addr;
 		if(typeof(var['fee']) == 'number'){
 			$bal = balance[base] - trigger.output[[asset=base]];
 			if(var['fee'] > 0 AND $bal > $FEE_THRESHOLD)
 				$change_fee = $LOW_FEE;
 			if(var['fee'] < 0 AND $bal < 2000)
 				$change_fee = $DEFAULT_FEE;
-			if(var['fee'] < 0 AND !$change_fee)
+			if(var['fee'] < 0 and !$change_fee)
 				$fee = $LOW_FEE;
 			else
 				$fee = $DEFAULT_FEE;
@@ -24,6 +26,8 @@
 			$change_fee = $DEFAULT_FEE;
 		}
 		$base_inp = trigger.output[[asset=base]] - $fee;
+		$value = trigger.data.value;
+		if(!trigger.data.approve AND $value AND (typeof($value) != 'number' OR $value <= 0)) bounce('Value param invalid');
 	}`,
 	messages: {
 		cases: [
@@ -32,10 +36,13 @@
 					trigger.data.approve
 				}`,
 				init: `{
-					if(!trigger.data.spender) bounce('Spender param missing');
-					if(!trigger.data.value) bounce('Value param missing');
-					if(!var['a_' || trigger.address]) bounce('You have no funds');
-					if(typeof(trigger.data.value) != 'number' OR trigger.data.value < 0) bounce('Value param invalid');
+					$approve = trigger.data.approve;
+					$perm_key = $P || $addr || $approve;
+
+					if(!var[$addr_key]) bounce('You have no funds');
+					if(!is_valid_address($approve) OR $approve == $addr) bounce('approve param invalid, specify address to approve instead of any other value');
+					if(!$value) bounce('Value param missing');
+					if(typeof($value) != 'number' OR $value < 0) bounce('Value param invalid');
 				}`,
 				messages: [
 					{
@@ -43,7 +50,7 @@
 						payload: {
 							asset: 'base',
 							outputs: [
-								{address: `{trigger.address}`,amount: `{$base_inp}`}
+								{address: `{$addr}`,amount: `{$base_inp}`}
 							]
 						}
 					},
@@ -51,9 +58,9 @@
 						app: 'state',
 						state: `{
 							if($change_fee) var['fee'] = $change_fee;
-							var['perm_' || trigger.address || '_' || trigger.data.spender] = trigger.data.value;
-							if(var['perm_' || trigger.address || '_' || trigger.data.spender] == 0) var['perm_' || trigger.address || '_' || trigger.data.spender] = false;
-							response['message'] = 'Approved '||trigger.data.spender||' to spend '||trigger.data.value ||' from your account';
+							var[$perm_key] = $value;
+							if(var[$perm_key] == 0) var[$perm_key] = false;
+							response['message'] = 'Approved '||$approve||' to spend '||$value ||' from your account';
 						}`
 					}
 				]
@@ -77,7 +84,7 @@
 						payload: {
 							asset: 'base',
 							outputs: [
-								{address: `{trigger.address}`,amount: `{$base_inp}`}
+								{address: `{$addr}`,amount: `{$base_inp}`}
 							]
 						}
 					},
@@ -85,7 +92,7 @@
 						app: 'state',
 						state: `{
 							if($change_fee) var['fee'] = $change_fee;
-							var['a_' || trigger.address] += $asset_inp;
+							var[$addr_key] += $asset_inp;
 							response['message'] = 'Added '||$asset_inp||' to your account';
 						}`
 					}
@@ -96,13 +103,13 @@
 					trigger.data.withdraw
 				}`,
 				init: `{
-					if(!var['a_' || trigger.address]) bounce('Nothing to withdraw');
-					$max_w = var['a_' || trigger.address]-(var['a_' || trigger.address] % 1);
-					if(!trigger.data.value) bounce('Value param missing, max to withdraw '||$max_w) ;
-					$w_amount = trigger.data.value - (trigger.data.value % 1);
+					if(!var[$addr_key]) bounce('Nothing to withdraw');
+					$max_w = var[$addr_key]-(var[$addr_key] % 1);
+					if(!$value) bounce('Value param missing, max to withdraw '||$max_w) ;
+					$w_amount = $value - ($value % 1);
+					
 					if($w_amount <= 0) bounce('Max to withdraw '||$max_w);
 					if($w_amount > $max_w) bounce('Not enough funds, max to withdraw '||$max_w);
-					
 				}`,
 				messages: [
 					{
@@ -110,7 +117,7 @@
 						payload: {
 							asset: 'base',
 							outputs: [
-								{address: `{trigger.address}`,amount: `{$base_inp}`}
+								{address: `{$addr}`,amount: `{$base_inp}`}
 							]
 						}
 					},
@@ -119,7 +126,7 @@
 						payload: {
 							asset: `{$ASSET}`,
 							outputs: [
-								{address: `{trigger.address}`,amount: `{$w_amount}`}
+								{address: `{$addr}`,amount: `{$w_amount}`}
 							]
 						}
 					},
@@ -127,7 +134,7 @@
 						app: 'state',
 						state: `{
 							if($change_fee) var['fee'] = $change_fee;
-							var['a_' || trigger.address] -= $w_amount;
+							var[$addr_key] -= $w_amount;
 							response['message'] = 'Withdrawn '||$w_amount||' from your account';
 						}`
 					}
@@ -138,10 +145,12 @@
 					trigger.data.transfer
 				}`,
 				init: `{
-					if(!var['a_'||trigger.address]) bounce('No funds found');
-					if(!trigger.data.to) bounce('To param missing');
-					if(!trigger.data.value) bounce('Value param missing');
-					if(trigger.data.value > var['a_'||trigger.address]) bounce('You have max '||var['a_'||trigger.address]);
+					$to = trigger.data.transfer;
+
+					if(!is_valid_address($to) OR $to == $addr) bounce('transfer param invalid, specify address to instead of any other value');
+					if(!var[$addr_key]) bounce('No funds found');
+					if(!$value) bounce('Value param missing');
+					if($value > var[$addr_key]) bounce('You have max '||var[$addr_key]);
 				}`,
 				messages: [
 					{
@@ -149,7 +158,7 @@
 						payload: {
 							asset: 'base',
 							outputs: [
-								{address: `{trigger.address}`,amount: `{$base_inp}`}
+								{address: `{$addr}`,amount: `{$base_inp}`}
 							]
 						}
 					},
@@ -157,10 +166,10 @@
 						app: 'state',
 						state: `{
 							if($change_fee) var['fee'] = $change_fee;
-							var['a_' || trigger.data.to] += trigger.data.value;
-							var['a_'||trigger.address] -= trigger.data.value;
-							if(var['a_'||trigger.address] == 0) var['a_'||trigger.address] = false;
-							response['message'] = 'Transfered '||trigger.data.value||' to '||trigger.data.to;
+							var[$A || $to] += $value;
+							var[$addr_key] -= $value;
+							if(var[$addr_key] == 0) var[$addr_key] = false;
+							response['message'] = 'Transferred '||$value||' to '||$to;
 						}`
 					}
 				]
@@ -170,13 +179,19 @@
 					trigger.data.transfer_from
 				}`,
 				init: `{
-					if(!trigger.data.from) bounce('From param missing');
-					if(!var['a_' || trigger.data.from]) bounce('Account have no funds');
-					if(!trigger.data.to) bounce('To param missing');
-					if(!trigger.data.value) bounce('Value param missing');
-					if(!var['perm_' || trigger.data.from || '_' || trigger.address]) bounce('Not allowed to spend');
-					if(var['perm_' || trigger.data.from || '_' || trigger.address] < trigger.data.value) bounce('You can spend max '||var['perm_' || trigger.data.from || '_' || trigger.address]);
-					if(trigger.data.value > var['a_' || trigger.data.from]) bounce('Account have '||var['a_' || trigger.data.from]);
+					$from = trigger.data.transfer_from;
+					$to = trigger.data.to;
+					$from_key = $A || $from;
+					$perm_key = $P || $from || $addr;
+
+					if(!is_valid_address($from)) bounce('transfer_from param invalid, specify from address instead of any other value');
+					if(!$to) bounce('To param missing');
+					if(!is_valid_address($to)) bounce('To param invalid');
+					if(!var[$from_key]) bounce('Account have no funds');
+					if(!$value) bounce('Value param missing');
+					if(!var[$perm_key]) bounce('Not allowed to spend');
+					if(var[$perm_key] < $value) bounce('You can spend max '||var[$perm_key]);
+					if(var[$from_key] < $value) bounce('Account have '||var[$from_key]);
 				}`,
 				messages: [
 					{
@@ -184,7 +199,7 @@
 						payload: {
 							asset: 'base',
 							outputs: [
-								{address: `{trigger.address}`,amount: `{$base_inp}`}
+								{address: `{$addr}`,amount: `{$base_inp}`}
 							]
 						}
 					},
@@ -192,12 +207,12 @@
 						app: 'state',
 						state: `{
 							if($change_fee) var['fee'] = $change_fee;
-							var['a_' || trigger.data.to] += trigger.data.value;
-							var['a_' || trigger.data.from] -= trigger.data.value;
-							if(var['a_' || trigger.data.from] == 0) var['a_' || trigger.data.from] = false;
-							var['perm_' || trigger.data.from || '_' || trigger.address] -= trigger.data.value;
-							if(var['perm_' || trigger.data.from || '_' || trigger.address] == 0) var['perm_' || trigger.data.from || '_' || trigger.address] = false;
-							response['message'] = 'Transfered '||trigger.data.value||' to '||trigger.data.to;
+							var[$A || $to] += $value;
+							var[$from_key] -= $value;
+							if(var[$from_key] == 0) var[$from_key] = false;
+							var[$perm_key] -= $value;
+							if(var[$perm_key] == 0) var[$perm_key] = false;
+							response['message'] = 'Transferred '||$value||' to '||$to;
 						}`
 					}
 				]
