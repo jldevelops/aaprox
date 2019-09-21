@@ -14,7 +14,7 @@
 				$change_fee = $LOW_FEE;
 			if(var['fee'] < 0 AND $bal < 2000)
 				$change_fee = $DEFAULT_FEE;
-			if(var['fee'] < 0)
+			if(var['fee'] < 0 AND !$change_fee)
 				$fee = $LOW_FEE;
 			else
 				$fee = $DEFAULT_FEE;
