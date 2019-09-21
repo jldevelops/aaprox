@@ -16,5 +16,5 @@ Accepted address params: `to`,`from`,`spender`
 
 Accepted numeric param: `value`
 
-https://testnetexplorer.obyte.org/#hWKoPMT2O8/0Um3u8hPYW3Wqh7IODcNCM7nOqgk4JRM=
-GP2TKQHIHYTFSJHNVS5ARBWEUCRU3PLV
+https://testnetexplorer.obyte.org/#GawjkSH5ac7sBdNSMIYmwDkxmabscQfOIoRFb88n0HA=
+HURSJKXFKSZOOXYZTLCCPPT64JHLD3AY
