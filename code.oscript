@@ -1,33 +1,24 @@
 {
 	init: `{
 		$ASSET = 'hd936lRtPN11pkgNv8qVnqN2OHMyAp8P/NsLp6KsuqA=';
-		$DEFAULT_FEE = 1000;
-		$FEE_THRESHOLD = 10000;
-		$LOW_FEE = -600;//-unit[trigger.unit].fee;
+		$FEE_LIMIT = 3000;//byte limit where AA starts paying trigger unit commissions
+		//account;permission;byte;
+		$A = 'a';$P = 'p';$B='b';$T='total_bytes';$S='last_storage_size';$L='last_address';
+		$trigger_cost = unit[trigger.unit].headers_commission + unit[trigger.unit].payload_commission;
 		$addr = trigger.address;
-		$ATTESTOR_ADDR = 'JBGMJI7XSKLKNHZF26BUBWHVUZSDV3P5';
-		if(!attestation[[attestors=$ATTESTOR_ADDR, address=$addr,ifnone=false]]) bounce('Not allowed to use, please attest your address with '||$ATTESTOR_ADDR);
-		$A = 'a';$P = 'p';
-
+		$last_addr = var[$L];
+		$balance = balance[base] - trigger.output[[asset=base]];
+		$free_mode = ($balance - var[$T]) > $FEE_LIMIT;
 		$addr_key = $A||$addr;
-		if(typeof(var['fee']) == 'number'){
-			$bal = balance[base] - trigger.output[[asset=base]];
-			if(var['fee'] > 0 AND $bal > $FEE_THRESHOLD)
-				$change_fee = $LOW_FEE;
-			if(var['fee'] < 0 AND $bal < 2000)
-				$change_fee = $DEFAULT_FEE;
-			if(var['fee'] < 0 and !$change_fee)
-				$fee = $LOW_FEE;
-			else
-				$fee = $DEFAULT_FEE;
-		}
-		else{
-			$fee = $DEFAULT_FEE;
-			$change_fee = $DEFAULT_FEE;
-		}
-		$base_inp = trigger.output[[asset=base]] - $fee;
+		$byte_key = $B ||$addr;
+		$last_key = $B ||$last_addr;
+		$base_inp = trigger.output[[asset=base]]+($free_mode?$trigger_cost:0);
 		$value = trigger.data.value;
 		if(!trigger.data.approve AND $value AND (typeof($value) != 'number' OR $value <= 0)) bounce('Value param invalid');
+		$last_storage_size = var[$S] otherwise 0;//last execution storage size
+		$storage_size = storage_size;//actual storage size
+		$update_st = $last_storage_size != $storage_size;
+		$diff_st = $last_storage_size - $storage_size;
 	}`,
 	messages: {
 		cases: [
@@ -46,21 +37,54 @@
 				}`,
 				messages: [
 					{
+						app: 'state',
+						state: `{
+							var[$perm_key] = $value;
+							if(var[$perm_key] == 0) var[$perm_key] = false;
+							var[$byte_key] += $base_inp;
+							var[$T] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
+							var[$L] = trigger.address;
+							response['message'] = 'Approved '||$approve||' to spend '||$value ||' from your account';
+						}`
+					}
+				]
+			},
+			{
+				if: `{
+					trigger.data.withdraw_bytes
+				}`,
+				init: `{
+					if(!var[$byte_key]) bounce('No bytes to withdraw');
+					if($update_st){
+						if($last_addr == $addr)
+							$diff = $diff_st > 0?$diff_st:0;
+					} 
+					$w_amount = var[$byte_key]-$diff;
+					$w_par = is_integer(trigger.data.withdraw_bytes)?trigger.data.withdraw_bytes:0;
+				}`,
+				messages: [
+					{
 						app: 'payment',
 						payload: {
 							asset: 'base',
 							outputs: [
-								{address: `{$addr}`,amount: `{$base_inp}`}
+								{address: `{$addr}`,amount: `{$w_amount+$base_inp-$w_par}`}
 							]
 						}
 					},
 					{
 						app: 'state',
 						state: `{
-							if($change_fee) var['fee'] = $change_fee;
-							var[$perm_key] = $value;
-							if(var[$perm_key] == 0) var[$perm_key] = false;
-							response['message'] = 'Approved '||$approve||' to spend '||$value ||' from your account';
+							$w_fee = unit[response_unit].headers_commission + unit[response_unit].payload_commission;
+							if($w_fee != $w_par) bounce('Your withdraw costs '||$w_fee||' bytes, please use withdraw_bytes param to set exact fee');
+							var[$byte_key] -= $w_amount;
+							var[$T] -=  $w_amount;
+							if(var[$byte_key] == 0) var[$byte_key] = false;
+							if(var[$T] == 0) var[$T] = false;
+							if($update_st AND $last_addr != $addr){ var[$last_key] -= $diff_st; var[$S] = $sto;}
+							var[$L] = trigger.address;
+							response['message'] = 'Withdrawn '||$w_amount||' bytes from your account';
 						}`
 					}
 				]
@@ -80,19 +104,13 @@
 				}`,
 				messages: [
 					{
-						app: 'payment',
-						payload: {
-							asset: 'base',
-							outputs: [
-								{address: `{$addr}`,amount: `{$base_inp}`}
-							]
-						}
-					},
-					{
 						app: 'state',
 						state: `{
-							if($change_fee) var['fee'] = $change_fee;
 							var[$addr_key] += $asset_inp;
+							var[$byte_key] += $base_inp;
+							var[$T] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
+							var[$L] = trigger.address;
 							response['message'] = 'Added '||$asset_inp||' to your account';
 						}`
 					}
@@ -115,15 +133,6 @@
 					{
 						app: 'payment',
 						payload: {
-							asset: 'base',
-							outputs: [
-								{address: `{$addr}`,amount: `{$base_inp}`}
-							]
-						}
-					},
-					{
-						app: 'payment',
-						payload: {
 							asset: `{$ASSET}`,
 							outputs: [
 								{address: `{$addr}`,amount: `{$w_amount}`}
@@ -133,8 +142,13 @@
 					{
 						app: 'state',
 						state: `{
-							if($change_fee) var['fee'] = $change_fee;
+							$w_fee = unit[response_unit].headers_commission + unit[response_unit].payload_commission;
 							var[$addr_key] -= $w_amount;
+							if(var[$addr_key] == 0) var[$addr_key]=false;
+							var[$byte_key] += $base_inp-$w_fee;
+							var[$T] += $base_inp-$w_fee;
+							if($update_st){ var[$last_key]-=$diff_st; var[$S]=$sto;}
+							var[$L] = trigger.address;
 							response['message'] = 'Withdrawn '||$w_amount||' from your account';
 						}`
 					}
@@ -154,21 +168,15 @@
 				}`,
 				messages: [
 					{
-						app: 'payment',
-						payload: {
-							asset: 'base',
-							outputs: [
-								{address: `{$addr}`,amount: `{$base_inp}`}
-							]
-						}
-					},
-					{
 						app: 'state',
 						state: `{
-							if($change_fee) var['fee'] = $change_fee;
 							var[$A || $to] += $value;
 							var[$addr_key] -= $value;
 							if(var[$addr_key] == 0) var[$addr_key] = false;
+							var[$byte_key] += $base_inp;
+							var[$T] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
+							var[$L] = trigger.address;
 							response['message'] = 'Transferred '||$value||' to '||$to;
 						}`
 					}
@@ -195,23 +203,17 @@
 				}`,
 				messages: [
 					{
-						app: 'payment',
-						payload: {
-							asset: 'base',
-							outputs: [
-								{address: `{$addr}`,amount: `{$base_inp}`}
-							]
-						}
-					},
-					{
 						app: 'state',
 						state: `{
-							if($change_fee) var['fee'] = $change_fee;
 							var[$A || $to] += $value;
 							var[$from_key] -= $value;
 							if(var[$from_key] == 0) var[$from_key] = false;
 							var[$perm_key] -= $value;
 							if(var[$perm_key] == 0) var[$perm_key] = false;
+							var[$byte_key] += $base_inp;
+							var[$T] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
+							var[$L] = trigger.address;
 							response['message'] = 'Transferred '||$value||' to '||$to;
 						}`
 					}
@@ -223,8 +225,10 @@
 						app: 'state',
 						state: `{
 							if(trigger.output[[asset!=base]].asset != 'none') bounce('To deposit an asset, use deposit param');
-							var['fee'] = $LOW_FEE;
-							response['usage'] = 'Send param = 1 for continue. Accepted params: deposit,withdraw,transfer,transfer_from,approve';
+							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
+							var[$L] = trigger.address;
+							response['usage'] = 'Send param = 1 for continue.';
+							response['accepted_params'] = 'deposit, withdraw, transfer, transfer_from, approve, withdraw_bytes';
 							response['message'] = 'Received bytes for funding AA operation, thaanks!';
 						}`
 					}
