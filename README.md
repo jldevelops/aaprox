@@ -3,18 +3,20 @@ A proxy AA for transfer ownership of a predefined asset
 
 It allows to divide asset until 15 decimal places max.
     
-It allows to do almost free transfers until run out of bytes, on that case it changes fee to `$DEFAULT_FEE`, it fills with leftover bytes until `$FEE_THRESHOLD` and then changes again to `$LOW_FEE` to restart cycle.
+It allows to do free transfers until run out of donated bytes (default case).
 
-Any byte donation will change cycle to `$LOW_FEE`.
+Each operation to AA needs 10000 byte deposit which could be withdrawn later.
+
+AA will add trigger unit fees to user if there are more bytes than `$FEE_LIMIT`
 
 User address can give permission to any other address using `approve`.
 
 ## Usage
-Accepted function params: `deposit`,`withdraw`,`transfer`,`transfer_from`,`approve`. Send function = 1 and follow instructions.
+Accepted function params: `deposit`,`withdraw`,`transfer`,`transfer_from`,`approve`,`withdraw_bytes`. Send function = 1 and follow instructions.
 
-Accepted address params: `to`,`from`,`spender`
+Accepted address params: `to`
 
 Accepted numeric param: `value`
 
-https://testnetexplorer.obyte.org/#GawjkSH5ac7sBdNSMIYmwDkxmabscQfOIoRFb88n0HA=
-HURSJKXFKSZOOXYZTLCCPPT64JHLD3AY
+https://testnetexplorer.obyte.org/#DdMbXjlIq7+iZCfaLFDJHpUt7NMBUgBsohl19y5IAI4=
+D2IWOACPY465O42ON7PVJ5ZRL5CRZ7JF
