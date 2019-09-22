@@ -76,9 +76,8 @@
 						state: `{
 							$w_fee = unit[response_unit].headers_commission + unit[response_unit].payload_commission;
 							if($w_fee != $w_par) bounce('Your withdraw costs '||$w_fee||' bytes, please use withdraw_bytes param to set exact fee');
-							var[$byte_key] -= $w_amount;
+							var[$byte_key] = false;
 							var[$TOTAL] -=  $w_amount;
-							if(var[$byte_key] == 0) var[$byte_key] = false;
 							if(var[$TOTAL] == 0) var[$TOTAL] = false;
 							if($update_st AND $last_addr != $addr){ var[$last_key] -= $diff_st; var[$STO] = $sto;}
 							var[$LAST] = $addr;
