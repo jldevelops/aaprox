@@ -2,23 +2,23 @@
 	init: `{
 		$ASSET = 'hd936lRtPN11pkgNv8qVnqN2OHMyAp8P/NsLp6KsuqA=';
 		$FEE_LIMIT = 3000;//byte limit where AA starts paying trigger unit commissions
-		//account;permission;byte;
-		$A = 'a';$P = 'p';$B='b';$T='total_bytes';$S='last_storage_size';$L='last_address';
+		$ADDR= 'a';$PERM = 'p';$BYTE='b';$TOTAL='total_bytes';$STO='last_storage_size';$LAST='last_address';
 		$trigger_cost = unit[trigger.unit].headers_commission + unit[trigger.unit].payload_commission;
 		$addr = trigger.address;
-		$last_addr = var[$L];
+		$last_addr = var[$LAST];
 		$balance = balance[base] - trigger.output[[asset=base]];
-		$free_mode = ($balance - var[$T]) > $FEE_LIMIT;
-		$addr_key = $A||$addr;
-		$byte_key = $B ||$addr;
-		$last_key = $B ||$last_addr;
+		$free_mode = ($balance - var[$TOTAL]) > $FEE_LIMIT;
+		$addr_key = $ADDR||$addr;
+		$addr_q = var[$addr_key];
+		$byte_key = $BYTE ||$addr;
+		$last_key = $BYTE ||$last_addr;
 		$base_inp = trigger.output[[asset=base]]+($free_mode?$trigger_cost:0);
 		$value = trigger.data.value;
 		if(!trigger.data.approve AND $value AND (typeof($value) != 'number' OR $value <= 0)) bounce('Value param invalid');
-		$last_storage_size = var[$S] otherwise 0;//last execution storage size
+		$last_storage_size = var[$STO] otherwise 0;//last execution storage size
 		$storage_size = storage_size;//actual storage size
-		$update_st = $last_storage_size != $storage_size;
-		$diff_st = $last_storage_size - $storage_size;
+		$diff_st = $storage_size - $last_storage_size;
+		$update_st = $diff_st != 0;
 	}`,
 	messages: {
 		cases: [
@@ -28,9 +28,9 @@
 				}`,
 				init: `{
 					$approve = trigger.data.approve;
-					$perm_key = $P || $addr || $approve;
+					$perm_key = $PERM || $addr || $approve;
 
-					if(!var[$addr_key]) bounce('You have no funds');
+					if(!$addr_q) bounce('You have no funds');
 					if(!is_valid_address($approve) OR $approve == $addr) bounce('approve param invalid, specify address to approve instead of any other value');
 					if(!$value) bounce('Value param missing');
 					if(typeof($value) != 'number' OR $value < 0) bounce('Value param invalid');
@@ -42,9 +42,9 @@
 							var[$perm_key] = $value;
 							if(var[$perm_key] == 0) var[$perm_key] = false;
 							var[$byte_key] += $base_inp;
-							var[$T] += $base_inp;
-							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
-							var[$L] = trigger.address;
+							var[$TOTAL] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$STO] = $sto;}
+							var[$LAST] = $addr;
 							response['message'] = 'Approved '||$approve||' to spend '||$value ||' from your account';
 						}`
 					}
@@ -56,12 +56,10 @@
 				}`,
 				init: `{
 					if(!var[$byte_key]) bounce('No bytes to withdraw');
-					if($update_st){
-						if($last_addr == $addr)
-							$diff = $diff_st > 0?$diff_st:0;
-					} 
+					$diff = ($update_st AND $last_addr == $addr AND $diff_st > 0) ? $diff_st : 0;
 					$w_amount = var[$byte_key]-$diff;
-					$w_par = is_integer(trigger.data.withdraw_bytes)?trigger.data.withdraw_bytes:0;
+					if($balance < $w_amount) bounce('Not enough bytes to withdraw');
+					$w_par = is_integer(trigger.data.withdraw_bytes) AND trigger.data.withdraw_bytes > 100?trigger.data.withdraw_bytes:100;
 				}`,
 				messages: [
 					{
@@ -79,11 +77,11 @@
 							$w_fee = unit[response_unit].headers_commission + unit[response_unit].payload_commission;
 							if($w_fee != $w_par) bounce('Your withdraw costs '||$w_fee||' bytes, please use withdraw_bytes param to set exact fee');
 							var[$byte_key] -= $w_amount;
-							var[$T] -=  $w_amount;
+							var[$TOTAL] -=  $w_amount;
 							if(var[$byte_key] == 0) var[$byte_key] = false;
-							if(var[$T] == 0) var[$T] = false;
-							if($update_st AND $last_addr != $addr){ var[$last_key] -= $diff_st; var[$S] = $sto;}
-							var[$L] = trigger.address;
+							if(var[$TOTAL] == 0) var[$TOTAL] = false;
+							if($update_st AND $last_addr != $addr){ var[$last_key] -= $diff_st; var[$STO] = $sto;}
+							var[$LAST] = $addr;
 							response['message'] = 'Withdrawn '||$w_amount||' bytes from your account';
 						}`
 					}
@@ -108,9 +106,9 @@
 						state: `{
 							var[$addr_key] += $asset_inp;
 							var[$byte_key] += $base_inp;
-							var[$T] += $base_inp;
-							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
-							var[$L] = trigger.address;
+							var[$TOTAL] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$STO] = $sto;}
+							var[$LAST] = $addr;
 							response['message'] = 'Added '||$asset_inp||' to your account';
 						}`
 					}
@@ -121,8 +119,8 @@
 					trigger.data.withdraw
 				}`,
 				init: `{
-					if(!var[$addr_key]) bounce('Nothing to withdraw');
-					$max_w = var[$addr_key]-(var[$addr_key] % 1);
+					if(!$addr_q) bounce('Nothing to withdraw');
+					$max_w = $addr_q-($addr_q % 1);
 					if(!$value) bounce('Value param missing, max to withdraw '||$max_w) ;
 					$w_amount = $value - ($value % 1);
 					
@@ -146,9 +144,9 @@
 							var[$addr_key] -= $w_amount;
 							if(var[$addr_key] == 0) var[$addr_key]=false;
 							var[$byte_key] += $base_inp-$w_fee;
-							var[$T] += $base_inp-$w_fee;
-							if($update_st){ var[$last_key]-=$diff_st; var[$S]=$sto;}
-							var[$L] = trigger.address;
+							var[$TOTAL] += $base_inp-$w_fee;
+							if($update_st){ var[$last_key]-=$diff_st; var[$STO]=$sto;}
+							var[$LAST] = $addr;
 							response['message'] = 'Withdrawn '||$w_amount||' from your account';
 						}`
 					}
@@ -162,21 +160,21 @@
 					$to = trigger.data.transfer;
 
 					if(!is_valid_address($to) OR $to == $addr) bounce('transfer param invalid, specify address to instead of any other value');
-					if(!var[$addr_key]) bounce('No funds found');
+					if(!$addr_q) bounce('No funds found');
 					if(!$value) bounce('Value param missing');
-					if($value > var[$addr_key]) bounce('You have max '||var[$addr_key]);
+					if($value > $addr_q) bounce('You have max '||$addr_q);
 				}`,
 				messages: [
 					{
 						app: 'state',
 						state: `{
-							var[$A || $to] += $value;
+							var[$ADDR|| $to] += $value;
 							var[$addr_key] -= $value;
 							if(var[$addr_key] == 0) var[$addr_key] = false;
 							var[$byte_key] += $base_inp;
-							var[$T] += $base_inp;
-							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
-							var[$L] = trigger.address;
+							var[$TOTAL] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$STO] = $sto;}
+							var[$LAST] = $addr;
 							response['message'] = 'Transferred '||$value||' to '||$to;
 						}`
 					}
@@ -189,8 +187,8 @@
 				init: `{
 					$from = trigger.data.transfer_from;
 					$to = trigger.data.to;
-					$from_key = $A || $from;
-					$perm_key = $P || $from || $addr;
+					$from_key = $ADDR|| $from;
+					$perm_key = $PERM || $from || $addr;
 
 					if(!is_valid_address($from)) bounce('transfer_from param invalid, specify from address instead of any other value');
 					if(!$to) bounce('To param missing');
@@ -205,15 +203,15 @@
 					{
 						app: 'state',
 						state: `{
-							var[$A || $to] += $value;
+							var[$ADDR|| $to] += $value;
 							var[$from_key] -= $value;
 							if(var[$from_key] == 0) var[$from_key] = false;
 							var[$perm_key] -= $value;
 							if(var[$perm_key] == 0) var[$perm_key] = false;
 							var[$byte_key] += $base_inp;
-							var[$T] += $base_inp;
-							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
-							var[$L] = trigger.address;
+							var[$TOTAL] += $base_inp;
+							if($update_st){ var[$last_key] -= $diff_st; var[$STO] = $sto;}
+							var[$LAST] = $addr;
 							response['message'] = 'Transferred '||$value||' to '||$to;
 						}`
 					}
@@ -224,12 +222,12 @@
 					{
 						app: 'state',
 						state: `{
-							if(trigger.output[[asset!=base]].asset != 'none') bounce('To deposit an asset, use deposit param');
-							if($update_st){ var[$last_key] -= $diff_st; var[$S] = $sto;}
-							var[$L] = trigger.address;
+							if(trigger.output[[asset!=base]].asset != 'none') bounce('To deposit asset, use deposit param');
+							if($update_st){ var[$last_key] -= $diff_st; var[$STO] = $sto;}
+							var[$LAST] = $addr;
 							response['usage'] = 'Send param = 1 for continue.';
 							response['accepted_params'] = 'deposit, withdraw, transfer, transfer_from, approve, withdraw_bytes';
-							response['message'] = 'Received bytes for funding AA operation, thaanks!';
+							response['message'] = 'Received donation for funding AA operation, thaanks!';
 						}`
 					}
 				]
