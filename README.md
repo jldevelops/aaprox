@@ -18,5 +18,5 @@ Accepted address params: `to`
 
 Accepted numeric param: `value`
 
-https://testnetexplorer.obyte.org/#PiVfIMIdIeC14PyQsZNbthgHtWXHPnF2OxtlvIfgeUo=
-BP4IODNVKCYFTPUGQUWCETHR5OORUYZI
+https://testnetexplorer.obyte.org/#hDXrrqszvmL/wFBFzvBE8Y458cyhYvEmWbjVrmkSbGw=
+TRRQY4WJJHBKOEJMWIAJ2JPVVPV7LROW
