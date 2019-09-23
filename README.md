@@ -5,11 +5,11 @@ It allows to divide asset until 15 decimal places max.
 
 Each operation to AA needs `$BYTE_INP` byte deposit which would be withdrawn later.
 
-Each withdraw or withdraw_bytes will cost exact amount of response unit fee bytes which would be deducted from byte deposited amount.
+Each withdraw or withdraw_bytes costs exact amount of response unit fee which is deducted from byte deposited amount.
 
 It allows to do free operations (except withdrawals) until run out of donated bytes (default case).
 
-AA will add trigger unit fees to user balance if there are more bytes than `$FEE_LIMIT`
+AA adds trigger unit fees to user balance if there are more bytes than `$FEE_LIMIT`
 
 User address can give permission to any other address using `approve`.
 
