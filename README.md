@@ -9,7 +9,7 @@ Each withdraw or withdraw_bytes costs exact amount of response unit fee which is
 
 It allows to do free operations (except withdrawals) until run out of donated bytes (default case).
 
-AA adds trigger unit fees to user balance if there are more bytes than `$FEE_LIMIT`
+AA adds trigger unit fees to user balance if there are more bytes than `$FREE_LIMIT`
 
 User address can give permission to any other address using `approve`.
 
@@ -20,5 +20,5 @@ Accepted address param: `to`
 
 Accepted numeric param: `value`
 
-https://testnetexplorer.obyte.org/#7XOsfItv3HmYqxcOlsnsafe5MqWKzXVrsp3D/a3fJzc=
-KAM5WF5QGMR23JMBYEPLYGE7QILBCMMJ
+https://testnetexplorer.obyte.org/#SCKFaMA7pY8aPBWhFOySbAAjXDH03zaT3up5MC/14bQ=
+6BXZTFIFY7DX7LDY536JBFSJHFLLRJIU
