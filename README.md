@@ -9,9 +9,11 @@ Each withdraw or withdraw_bytes costs exact amount of response unit fee which is
 
 It allows to do free operations (except withdrawals) until run out of donated bytes (default case).
 
-AA adds trigger unit fees to user balance if there are more bytes than `$FREE_LIMIT`
+AA adds trigger unit fees to user balance if there are more bytes than `$FREE_LIMIT`.
 
 User address can give permission to any other address using `approve`.
+
+Optionally, a constant `$ATTESTOR_ADDR` could be defined to limit access to AA. On that case, withdrawals will be also paid by AA with donated bytes.
 
 ## Usage
 Accepted function params: `withdraw`,`transfer`,`transfer_from`,`approve`,`withdraw_bytes`. Send function = 1 and follow instructions.
