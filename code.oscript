@@ -3,6 +3,8 @@
 		$ASSET = 'hd936lRtPN11pkgNv8qVnqN2OHMyAp8P/NsLp6KsuqA=';
 		$BYTE_INP = 10000;
 		$FREE_LIMIT = 3000;
+		$ATTESTOR_ADDR = '';
+		if(!attestation[[attestors=$ATTESTOR_ADDR, address=trigger.address,ifnone=false]]) bounce('Not allowed to use, please attest your address with '||$ATTESTOR_ADDR);
 		$ADDR = 'a';$PERM = 'p';$BYTE = 'b';$TOTAL = 'total';
 		$base = trigger.output[[asset=base]];
 		$trigger_cost = unit[trigger.unit].headers_commission + unit[trigger.unit].payload_commission;
