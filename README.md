@@ -14,7 +14,7 @@ AA adds trigger unit fees to user balance if there are more bytes than `$FREE_LI
 User address can give permission to any other address using `approve`.
 
 ## Usage
-Accepted function params: `deposit`,`withdraw`,`transfer`,`transfer_from`,`approve`,`withdraw_bytes`. Send function = 1 and follow instructions.
+Accepted function params: `withdraw`,`transfer`,`transfer_from`,`approve`,`withdraw_bytes`. Send function = 1 and follow instructions.
 
 Accepted address param: `to`
 
