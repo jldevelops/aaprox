@@ -5,7 +5,7 @@ It allows to divide asset until 15 decimal places max.
 
 Each operation to AA needs `$BYTE_INP` byte deposit which would be withdrawn later.
 
-Each withdraw or withdraw_bytes costs exact amount of response unit fee which is deducted from byte deposited amount.
+Each withdraw or withdraw_bytes costs "exact" amount of response unit fee which is deducted from byte deposited amount.
 
 It allows to do free operations (except withdrawals) until run out of donated bytes (default case).
 
