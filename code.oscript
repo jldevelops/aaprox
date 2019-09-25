@@ -2,23 +2,23 @@
 	init: `{
 		$ASSET = 'hd936lRtPN11pkgNv8qVnqN2OHMyAp8P/NsLp6KsuqA=';
 		$BYTE_INP = 10000;
-		$FREE_LIMIT = 3000;
-		$ATTESTOR_ADDR = '';
-		if(!attestation[[attestors=$ATTESTOR_ADDR, address=trigger.address,ifnone=false]]) bounce('Not allowed to use, please attest your address with '||$ATTESTOR_ADDR);
+		$FREE_LIMIT = 2000;
 		$ADDR = 'a';$PERM = 'p';$BYTE = 'b';$TOTAL = 'total';
 		$base = trigger.output[[asset=base]];
 		$trigger_cost = unit[trigger.unit].headers_commission + unit[trigger.unit].payload_commission;
 		$addr = trigger.address;
 		$balance = balance[base] - $base - storage_size;
-		$free_mode = ($balance - var[$TOTAL]) > $FREE_LIMIT ;
+		$free_mode = ($balance - var[$TOTAL]) > $FREE_LIMIT;
 		$addr_key = $ADDR || $addr;
 		$addr_q = var[$addr_key];
 		$byte_key = $BYTE || $addr;
 		$base_inp = $base + ($free_mode?$trigger_cost:0);
 		$value = trigger.data.value;
-		if(!trigger.data.approve AND $value AND (typeof($value) != 'number' OR $value <= 0)) bounce('Value param invalid');
 		if(trigger.output[[asset!=base]].asset != 'none')
 			$asset = trigger.output[[asset!=base]].asset;
+
+		if($ATTESTOR_ADDR AND !attestation[[attestors=$ATTESTOR_ADDR, address=trigger.address,ifnone=false]]) bounce('Not allowed to use, please attest your address with '||$ATTESTOR_ADDR);
+		if(!trigger.data.approve AND $value AND (typeof($value) != 'number' OR $value <= 0)) bounce('Value param invalid');
 	}`,
 	messages: {
 		cases: [
@@ -39,6 +39,7 @@
 						app: 'state',
 						state: `{
 							var[$perm_key] = $value;
+							
 							if(var[$perm_key] == 0) var[$perm_key] = false;
 							var[$byte_key] += $base_inp;
 							var[$TOTAL] += $base_inp;
@@ -52,12 +53,12 @@
 					trigger.data.withdraw_bytes AND $base == $BYTE_INP
 				}`,
 				init: `{
-					$user_bal = var[$byte_key];
-					if(!$user_bal) bounce('No bytes to withdraw');
+					$user_bal = var[$byte_key] otherwise 0;
 					$w_amount = $balance < $user_bal ? $balance : $user_bal;
-					
 					$wt = round($w_amount / $BYTE_INP);
-					$w_fee = !!$ATTESTOR_ADDR AND $free_mode ?0 : (($wt > 2) ? 462+$wt*60 : 522);
+					$w_fee = $ATTESTOR_ADDR AND $free_mode ?0 : (($wt > 2) ? 462+$wt*60 : 522);
+					
+					if($user_bal == 0) bounce('No bytes to withdraw');
 				}`,
 				messages: [
 					{
@@ -73,6 +74,7 @@
 						app: 'state',
 						state: `{
 							var[$byte_key] = false;
+
 							var[$TOTAL] -= $w_amount;
 							response['message'] = 'Withdrawn '||$w_amount||' bytes less '||$w_fee||' fee from your account';
 						}`
@@ -84,15 +86,17 @@
 					$asset AND $base == $BYTE_INP
 				}`,
 				init: `{
+					$asset_inp = trigger.output[[asset!=base]];
+				
 					if($asset == 'ambiguous') bounce('Only 1 asset per tx');
 					if($asset != $ASSET) bounce('You must deposit '||$ASSET);
-					$asset_inp = trigger.output[[asset!=base]];
 				}`,
 				messages: [
 					{
 						app: 'state',
 						state: `{
 							var[$addr_key] += $asset_inp;
+
 							var[$byte_key] += $base_inp;
 							var[$TOTAL] += $base_inp;
 							response['message'] = 'Added '||$asset_inp||' to your account';
@@ -105,11 +109,11 @@
 					trigger.data.withdraw AND $base == $BYTE_INP
 				}`,
 				init: `{
-					if(!$addr_q) bounce('Nothing to withdraw');
 					$max_w = $addr_q-($addr_q % 1);
-					if(!$value) bounce('Value param missing, max to withdraw '||$max_w) ;
 					$w_amount = $value - ($value % 1);
-					
+
+					if(!$value) bounce('Value param missing, max to withdraw '||$max_w) ;
+					if(!$addr_q) bounce('Nothing to withdraw');
 					if($w_amount <= 0) bounce('Max to withdraw '||$max_w);
 					if($w_amount > $max_w) bounce('Not enough asset, max to withdraw '||$max_w);
 				}`,
@@ -126,11 +130,13 @@
 					{
 						app: 'state',
 						state: `{
-							if(!!$ATTESTOR_ADDR AND $free_mode)
+							if($ATTESTOR_ADDR AND $free_mode)
 								$w_fee = 0;
 							else
 								$w_fee = unit[response_unit].headers_commission + unit[response_unit].payload_commission;
+
 							var[$addr_key] -= $w_amount;
+
 							if(var[$addr_key] == 0) var[$addr_key]=false;
 							var[$byte_key] += ($base_inp-$w_fee);
 							var[$TOTAL] += ($base_inp-$w_fee);
@@ -157,6 +163,7 @@
 						state: `{
 							var[$ADDR|| $to] += $value;
 							var[$addr_key] -= $value;
+
 							if(var[$addr_key] == 0) var[$addr_key] = false;
 							var[$byte_key] += $base_inp;
 							var[$TOTAL] += $base_inp;
@@ -190,8 +197,9 @@
 						state: `{
 							var[$ADDR|| $to] += $value;
 							var[$from_key] -= $value;
-							if(var[$from_key] == 0) var[$from_key] = false;
 							var[$perm_key] -= $value;
+
+							if(var[$from_key] == 0) var[$from_key] = false;
 							if(var[$perm_key] == 0) var[$perm_key] = false;
 							var[$byte_key] += $base_inp;
 							var[$TOTAL] += $base_inp;
@@ -205,10 +213,9 @@
 					{
 						app: 'state',
 						state: `{
-							if(trigger.output[[asset!=base]].asset != 'none') bounce('Allowed asset: '||$ASSET);
-							response['asset'] = 'Allowed asset: '||$ASSET;
+							if($asset) bounce('Allowed asset: '||$ASSET);
 							response['accepted_params'] = 'withdraw, transfer, transfer_from, approve, withdraw_bytes';
-							response['usage'] = 'Send '||$BYTE_INP||' bytes and param = 1 for continue.';
+							response['usage'] = 'Send '||$BYTE_INP||' bytes and param or deposit '||$ASSET||' = 1 for continue.';
 							response['message'] = 'Received donation for funding AA operation, thaanks!';
 						}`
 					}
