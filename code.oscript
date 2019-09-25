@@ -55,7 +55,7 @@
 				init: `{
 					$user_bal = var[$byte_key] otherwise 0;
 					$w_amount = $balance < $user_bal ? $balance : $user_bal;
-					$wt = round($w_amount / $BYTE_INP);
+					$wt = ($w_amount / $BYTE_INP) + (1-(($w_amount / $BYTE_INP)%1));
 					$w_fee = $ATTESTOR_ADDR AND $free_mode ?0 : (($wt > 2) ? 462+$wt*60 : 522);
 					
 					if($user_bal == 0) bounce('No bytes to withdraw');
