@@ -215,7 +215,7 @@
 						state: `{
 							if($asset) bounce('Allowed asset: '||$ASSET);
 							response['accepted_params'] = 'withdraw, transfer, transfer_from, approve, withdraw_bytes';
-							response['usage'] = 'Send '||$BYTE_INP||' bytes and param or deposit '||$ASSET||' = 1 for continue.';
+							response['usage'] = 'Send '||$BYTE_INP||' bytes and param = 1 or deposit '||$ASSET||' for continue.';
 							response['message'] = 'Received donation for funding AA operation, thaanks!';
 						}`
 					}
